@@ -31,6 +31,7 @@ function PerformanceScreen() {
   });
   const {
     cacheConfig,
+    setCacheConfig, 
     caches,
     getSteps,
     simState,
@@ -245,6 +246,24 @@ function PerformanceScreen() {
           >
             FULLY ASSOCIATIVE
           </motion.button>
+
+          <motion.button
+              onClick={() => {
+                setCacheConfig({
+                  writePolicy: cacheConfig.writePolicy === "WRITE_BACK" ? "WRITE_THROUGH" : "WRITE_BACK",
+                });
+              }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className={`text-sm px-4 py-2 rounded-lg font-bold ${
+                cacheConfig.writePolicy === "WRITE_BACK"
+                  ? "bg-black text-white"
+                  : "bg-gray-200 text-black"
+              }`}
+            >
+              {cacheConfig.writePolicy === "WRITE_BACK" ? "Write Back" : "Write Through"}
+            </motion.button>
+
         </div>
       </header>
       <div className="w-fit text-sm flex items-center gap-2 bg-white px-4 py-1 rounded-full">

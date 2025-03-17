@@ -89,6 +89,8 @@ const useSimStore = create((set, get) => ({
     get().initializeCaches();
   },
 
+
+
   setCurrentStep: (step) => {
     set(() => ({ currentStep: step }));
   },
@@ -113,6 +115,12 @@ const useSimStore = create((set, get) => ({
       }));
     }
     get().initializeCaches();
+  },
+
+  setCacheConfig: (config) => {
+    set((prev) => ({
+      cacheConfig: { ...prev.cacheConfig, ...config },
+    }));
   },
 
   getReadMissRate: () => {
