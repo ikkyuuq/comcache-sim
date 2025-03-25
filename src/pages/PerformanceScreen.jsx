@@ -85,6 +85,10 @@ function PerformanceScreen() {
 	const [hitCount, setHitCount] = useState(hit);
 	const [missCount, setMissCount] = useState(miss);
 
+	const [isPerformanceOpen, setIsPerformanceOpen] = useState(true);
+	const [isTableOpen, setIsTableOpen] = useState(true);
+	const [isMessageLogOpen, setIsMessageLogOpen] = useState(true);
+
 	useEffect(() => {
 		setHitCount(hit);
 		setMissCount(miss);
@@ -276,165 +280,200 @@ function PerformanceScreen() {
 				<main className="mt-4 flex gap-4 flex-1">
 					{/* Cache Performance Overview */}
 					<div className="flex flex-col w-full">
-						<h3 className="text-sm font-medium text-gray-500 mb-3">
-							Cache Performance
-						</h3>
+						<div className="flex flex-row justify-between items-center mb-3">
+							<h3 className="text-sm font-medium text-gray-500 mb-3">
+								Cache Performance
+							</h3>
+							<SimulationControls
+								onReset={handleReset}
+								onPrevious={handlePreviousStep}
+								onNext={handleNextStep}
+								onFastForward={handleFastForward}
+							/>
+						</div>
 						<div className="flex flex-col lg:flex-row w-full gap-4">
-							<div className="bg-white h-fit flex-1 rounded-lg shadow-sm border border-gray-100 p-4 overflow-x-auto">
-								<div>
-									<Line data={data} options={options} />
-								</div>
-								{/* Hit/Miss Rate Cards */}
-								<div className="flex gap-4 mb-6">
-									<div className="flex-1 bg-emerald-50 rounded-lg p-4 border border-emerald-100">
-										<div className="text-3xl font-semibold text-emerald-600 mb-1">
-											{Number.parseFloat(hitRate * 100).toFixed(4)}%
+							<div className="flex flex-col gap-2 w-full flex-1">
+								<button
+									type="button"
+									onClick={() => setIsPerformanceOpen(!isPerformanceOpen)}
+									className="flex items-center gap-2 p-2 bg-white rounded-t-lg hover:bg-gray-50"
+								>
+									<FiMessageCircle className="text-xl" />
+									<span className="font-bold">Performances</span>
+									{isPerformanceOpen ? <FiX /> : <FiEye />}
+								</button>
+								{isPerformanceOpen && (
+									<div className="bg-white h-fit flex-1 rounded-lg shadow-sm border border-gray-100 p-4 overflow-x-auto">
+										<div>
+											<Line data={data} options={options} />
 										</div>
-										<div className="text-xs font-medium text-emerald-500">
-											Hit Rate
+										{/* Hit/Miss Rate Cards */}
+										<div className="flex gap-4 mb-6">
+											<div className="flex-1 bg-emerald-50 rounded-lg p-4 border border-emerald-100">
+												<div className="text-3xl font-semibold text-emerald-600 mb-1">
+													{Number.parseFloat(hitRate * 100).toFixed(4)}%
+												</div>
+												<div className="text-xs font-medium text-emerald-500">
+													Hit Rate
+												</div>
+											</div>
+
+											<div className="flex-1 bg-rose-50 rounded-lg p-4 border border-rose-100">
+												<div className="text-3xl font-semibold text-rose-600 mb-1">
+													{Number.parseFloat(missRate * 100).toFixed(4)}%
+												</div>
+												<div className="text-xs font-medium text-rose-500">
+													Miss Rate
+												</div>
+											</div>
 										</div>
-									</div>
 
-									<div className="flex-1 bg-rose-50 rounded-lg p-4 border border-rose-100">
-										<div className="text-3xl font-semibold text-rose-600 mb-1">
-											{Number.parseFloat(missRate * 100).toFixed(4)}%
+										{/* AMAT Card */}
+										<div className="bg-gray-50 rounded-lg p-4 mb-6 text-center">
+											<div className="text-2xl font-semibold text-gray-700 mb-1">
+												{Number.parseFloat(avgAccessTime).toFixed(4)}
+											</div>
+											<div className="text-sm text-gray-500">
+												Average Access Memory Time (AMAT)
+											</div>
 										</div>
-										<div className="text-xs font-medium text-rose-500">
-											Miss Rate
+
+										{/* Stall Cycles */}
+										<div className="flex gap-4 mb-6">
+											<div className="flex-1 rounded-lg p-3 bg-blue-50 border border-blue-100">
+												<div className="text-xl font-medium text-blue-600 mb-1">
+													{Number.parseInt(readStallCycle)}
+												</div>
+												<div className="text-xs text-blue-500">
+													Read Stall Cycles
+												</div>
+											</div>
+
+											<div className="flex-1 rounded-lg p-3 bg-indigo-50 border border-indigo-100">
+												<div className="text-xl font-medium text-indigo-600 mb-1">
+													{Number.parseInt(writeStallCycle)}
+												</div>
+												<div className="text-xs text-indigo-500">
+													Write Stall Cycles
+												</div>
+											</div>
 										</div>
-									</div>
-								</div>
 
-								{/* AMAT Card */}
-								<div className="bg-gray-50 rounded-lg p-4 mb-6 text-center">
-									<div className="text-2xl font-semibold text-gray-700 mb-1">
-										{Number.parseFloat(avgAccessTime).toFixed(4)}
+										{/* Additional Metrics */}
+										{/* <div className="space-y-3"> */}
+										{/* 	<div> */}
+										{/* 		<span className="text-sm text-gray-500 "> */}
+										{/* 			Value from current access */}
+										{/* 		</span> */}
+										{/* 	</div> */}
+										{/* 	<div className="flex justify-between items-center p-2 bg-gray-50 rounded"> */}
+										{/* 		<span className="text-sm text-gray-500"> */}
+										{/* 			Write Miss Penalty */}
+										{/* 		</span> */}
+										{/* 		<span className="font-medium text-gray-700"> */}
+										{/* 			{Number.parseInt(writeMissPenalty)} */}
+										{/* 		</span> */}
+										{/* 	</div> */}
+										{/**/}
+										{/* 	<div className="flex justify-between items-center p-2 bg-gray-50 rounded"> */}
+										{/* 		<span className="text-sm text-gray-500"> */}
+										{/* 			Write Buffer Stall */}
+										{/* 		</span> */}
+										{/* 		<span className="font-medium text-gray-700"> */}
+										{/* 			{Number.parseInt(writeBufferStall)} */}
+										{/* 		</span> */}
+										{/* 	</div> */}
+										{/**/}
+										{/* 	<div className="flex justify-between items-center p-2 bg-gray-50 rounded"> */}
+										{/* 		<span className="text-sm text-gray-500">CPU Time</span> */}
+										{/* 		<span className="font-medium text-gray-700"> */}
+										{/* 			{Number.parseFloat(cpuTime).toFixed(4)} */}
+										{/* 		</span> */}
+										{/* 	</div> */}
+										{/* </div> */}
 									</div>
-									<div className="text-sm text-gray-500">
-										Average Access Memory Time (AMAT)
-									</div>
-								</div>
-
-								{/* Stall Cycles */}
-								<div className="flex gap-4 mb-6">
-									<div className="flex-1 rounded-lg p-3 bg-blue-50 border border-blue-100">
-										<div className="text-xl font-medium text-blue-600 mb-1">
-											{Number.parseInt(readStallCycle)}
-										</div>
-										<div className="text-xs text-blue-500">
-											Read Stall Cycles
-										</div>
-									</div>
-
-									<div className="flex-1 rounded-lg p-3 bg-indigo-50 border border-indigo-100">
-										<div className="text-xl font-medium text-indigo-600 mb-1">
-											{Number.parseInt(writeStallCycle)}
-										</div>
-										<div className="text-xs text-indigo-500">
-											Write Stall Cycles
-										</div>
-									</div>
-								</div>
-
-								{/* Additional Metrics */}
-								<div className="space-y-3">
-									<div>
-										<span className="text-sm text-gray-500 ">
-											Value from current access
-										</span>
-									</div>
-									<div className="flex justify-between items-center p-2 bg-gray-50 rounded">
-										<span className="text-sm text-gray-500">
-											Write Miss Penalty
-										</span>
-										<span className="font-medium text-gray-700">
-											{Number.parseInt(writeMissPenalty)}
-										</span>
-									</div>
-
-									<div className="flex justify-between items-center p-2 bg-gray-50 rounded">
-										<span className="text-sm text-gray-500">
-											Write Buffer Stall
-										</span>
-										<span className="font-medium text-gray-700">
-											{Number.parseInt(writeBufferStall)}
-										</span>
-									</div>
-
-									<div className="flex justify-between items-center p-2 bg-gray-50 rounded">
-										<span className="text-sm text-gray-500">CPU Time</span>
-										<span className="font-medium text-gray-700">
-											{Number.parseFloat(cpuTime).toFixed(4)}
-										</span>
-									</div>
-								</div>
-
-								<SimulationControls
-									onReset={handleReset}
-									onPrevious={handlePreviousStep}
-									onNext={handleNextStep}
-									onFastForward={handleFastForward}
-								/>
+								)}
 							</div>
-
 							{/* Table Simulation */}
-							<div className="flex-1 min-w-[300px] overflow-x-auto">
-								<CustomTable
-									caches={caches}
-									cacheType={mode}
-									cacheResult={cacheResult}
-									associativity={cacheConfig.associativity}
-									actionToIndex={actionToIndex}
-									action={action}
-									actionWay={simState.way}
-									writePolicy={cacheConfig.writePolicy}
-									iconAction={
-										action === "SEARCH" ? (
-											<FiEye />
-										) : action === "WRITE" ? (
-											<FiPlus />
-										) : action === "REPLACE" ? (
-											<FiRepeat />
-										) : null
-									}
-								/>
+							<div className="flex flex-col gap-2 w-full flex-1 min-w-64 lg:max-w-2xl flex-1">
+								<button
+									type="button"
+									onClick={() => setIsTableOpen(!isTableOpen)}
+									className="flex items-center gap-2 p-2 bg-white rounded-t-lg hover:bg-gray-50"
+								>
+									<FiMessageCircle className="text-xl" />
+									<span className="font-bold">Table Simulation</span>
+									{isTableOpen ? <FiX /> : <FiEye />}
+								</button>
+								{isTableOpen && (
+									<div className="flex-1">
+										<CustomTable
+											caches={caches}
+											cacheType={mode}
+											cacheResult={cacheResult}
+											associativity={cacheConfig.associativity}
+											actionToIndex={actionToIndex}
+											action={action}
+											actionWay={simState.way}
+											writePolicy={cacheConfig.writePolicy}
+											iconAction={
+												action === "SEARCH" ? (
+													<FiEye />
+												) : action === "WRITE" ? (
+													<FiPlus />
+												) : action === "REPLACE" ? (
+													<FiRepeat />
+												) : null
+											}
+										/>
+									</div>
+								)}
 							</div>
 						</div>
 					</div>
 				</main>
-				<div className="relative">
-					<div className="my-4 flex flex-col gap-2 absolute top-0">
-						{/* Messages */}
-						<div className="min-h-48">
+				<div className="my-4 flex flex-col gap-2 shadow-lg z-10">
+					{/* Toggle Button */}
+					<button
+						type="button"
+						onClick={() => setIsMessageLogOpen(!isMessageLogOpen)}
+						className="flex items-center gap-2 p-2 bg-white rounded-t-lg hover:bg-gray-50"
+					>
+						<FiMessageCircle className="text-xl" />
+						<span className="font-bold">Message Log</span>
+						{isMessageLogOpen ? <FiX /> : <FiEye />}
+					</button>
+
+					{/* Messages */}
+					{isMessageLogOpen && (
+						<div className="bg-white rounded-b-lg max-h-64 overflow-y-auto">
 							{messageLog
 								.filter((_, i) => i === currentStep - 1)
 								.map((msgs, i) => (
 									<div
 										// biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
 										key={i}
-										className="mt-4 bg-white rounded-xl h-full w-fit"
+										className="p-4 border-b border-gray-100"
 									>
-										<div className="flex flex-col gap-2 p-4">
+										<div className="flex flex-col gap-2">
 											<div className="flex gap-1 items-center">
 												<FiMessageCircle className="text-xl" />
 												<span className="font-bold">COMCACHE</span>
 											</div>
 											<div className="whitespace-pre-line">
 												<p className="px-4 font-medium">{msgs[0]}</p>
-												{msgs.slice(1).map((msg, j) => {
-													return (
-														// biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
-														<p key={j} className="mt-2 px-4 text-gray-600">
-															{msg}
-														</p>
-													);
-												})}
+												{msgs.slice(1).map((msg, j) => (
+													// biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
+													<p key={j} className="mt-2 px-4 text-gray-600">
+														{msg}
+													</p>
+												))}
 											</div>
 										</div>
 									</div>
 								))}
 						</div>
-					</div>
+					)}
 				</div>
 			</div>
 		</>

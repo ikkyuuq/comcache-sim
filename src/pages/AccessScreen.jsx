@@ -15,6 +15,7 @@ import CustomTable from "../components/CustomTable";
 import CacheTypeSelector from "../components/shared/CacheTypeSelector";
 import SimulationControls from "../components/shared/SimulationControls";
 import useSimStore from "../hooks/store";
+import ModalConfig from "../components/ModalConfig";
 
 function AccessScreen() {
 	const CacheTypes = Object.freeze({
@@ -52,10 +53,6 @@ function AccessScreen() {
 		setHitCount(hit);
 		setMissCount(miss);
 	}, [hit, miss]);
-
-	const handleChangeCacheType = (type) => {
-		setMode(type);
-	};
 
 	const [selectedBlock, setSelectedBlock] = useState(null);
 	const addresses = [
@@ -131,10 +128,30 @@ function AccessScreen() {
 			nextStep();
 		}
 	};
+
+	const [modalConfigurationOpen, setModalConfigurationOpen] = useState(false);
+	const [isMessageLogOpen, setIsMessageLogOpen] = useState(true);
+	const [isCacheBlocksOpen, setIsCacheBlocksOpen] = useState(true);
+	const [isTableOpen, setIsTableOpen] = useState(true);
+
+	const handleOpenModal = () => {
+		setModalConfigurationOpen(true);
+	};
+
+	const handleChangeCacheType = (mode) => {
+		setMode(mode);
+		handleReset();
+	};
+
 	return (
 		<>
 			<header className="flex justify-between items-center">
 				<div className="flex items-center gap-2">
+					<ModalConfig
+						CacheTypes={CacheTypes}
+						modalConfigurationOpen={modalConfigurationOpen}
+						setModalConfigurationOpen={setModalConfigurationOpen}
+					/>
 					<div className="flex gap-2 items-center">
 						<FiSliders className="text-2xl" />
 						<h1 className="text-2xl font-bold">Cache Access View</h1>
@@ -142,6 +159,7 @@ function AccessScreen() {
 					<button
 						type="button"
 						className="px-4 py-1 rounded-lg bg-white hover:bg-gray-50 "
+						onClick={handleOpenModal}
 					>
 						Configure
 					</button>
@@ -163,102 +181,140 @@ function AccessScreen() {
 			<div className="flex flex-col justify-between ">
 				<main className="mt-4 flex gap-4 flex-1">
 					<div className="flex flex-col w-full">
-						<h3 className="text-sm font-medium text-gray-500 mb-3">
-							Cache Blocks
-						</h3>
+						<div className="flex flex-row justify-between items-center mb-3">
+							<h3 className="text-sm font-medium text-gray-500 mb-3">
+								Cache Blocks
+							</h3>
+							<SimulationControls
+								onReset={handleReset}
+								onPrevious={handlePreviousStep}
+								onNext={handleNextStep}
+								onFastForward={handleFastForward}
+							/>
+						</div>
 						<div className="flex flex-col lg:flex-row w-full gap-4">
 							{/* Cache Blocks */}
-							<div className="flex-wrap flex flex-col flex-1 gap-2">
-								<motion.div
-									layout
-									transition={{ duration: 0.3, ease: "easeInOut" }}
-									className="flex flex-col lg:flex-row flex-1 gap-2 flex-wrap overflow-x-auto"
+							<div className="flex flex-col gap-2 w-full flex-1">
+								<button
+									type="button"
+									onClick={() => setIsCacheBlocksOpen(!isCacheBlocksOpen)}
+									className="flex items-center gap-2 p-2 bg-white rounded-t-lg hover:bg-gray-50"
 								>
-									{caches.map((block) => (
-										<CacheBlock
-											key={block.index}
-											index={block.index}
-											selected={selectedBlock}
-											actionToIndex={actionToIndex}
-											setSelected={() => setSelectedBlock(block.index)}
-											action={cacheResult}
-											cacheType={mode}
-											contains={caches.find((b) =>
-												mode === CacheTypes.FULLY_ASSOCIATIVE
-													? b.index === block.index &&
-														b.ways.some((w) => w.valid)
-													: mode === CacheTypes.SET_ASSOCIATIVE
-														? b.index === block.index &&
-															b.ways.find((w) => w.valid)
-														: b.index === block.index && b.valid,
-											)}
-										/>
-									))}
-								</motion.div>
+									<FiMessageCircle className="text-xl" />
+									<span className="font-bold">Cache Blocks</span>
+									{isCacheBlocksOpen ? <FiX /> : <FiEye />}
+								</button>
+								{isCacheBlocksOpen && (
+									<div className="flex-wrap flex flex-col flex-1 gap-2">
+										<motion.div
+											layout
+											transition={{ duration: 0.3, ease: "easeInOut" }}
+											className="flex flex-row gap-2 flex-wrap overflow-x-auto"
+										>
+											{caches.map((block) => (
+												<CacheBlock
+													key={block.index}
+													index={block.index}
+													selected={selectedBlock}
+													actionToIndex={actionToIndex}
+													setSelected={() => setSelectedBlock(block.index)}
+													action={cacheResult}
+													cacheType={mode}
+													contains={caches.find((b) =>
+														mode === CacheTypes.FULLY_ASSOCIATIVE
+															? b.index === block.index &&
+																b.ways.some((w) => w.valid)
+															: mode === CacheTypes.SET_ASSOCIATIVE
+																? b.index === block.index &&
+																	b.ways.find((w) => w.valid)
+																: b.index === block.index && b.valid,
+													)}
+												/>
+											))}
+										</motion.div>
+									</div>
+								)}
 							</div>
 							{/* Table Simulation */}
-							<div className="flex-1">
-								<CustomTable
-									caches={caches}
-									cacheType={mode}
-									cacheResult={cacheResult}
-									associativity={cacheConfig.associativity}
-									actionToIndex={actionToIndex}
-									action={action}
-									actionWay={simState.way}
-									iconAction={
-										action === "SEARCH" ? (
-											<FiEye />
-										) : action === "WRITE" ? (
-											<FiPlus />
-										) : action === "REPLACE" ? (
-											<FiRepeat />
-										) : null
-									}
-								/>
+							<div className="flex flex-col gap-2 w-full flex-1 min-w-64 lg:max-w-2xl flex-1">
+								<button
+									type="button"
+									onClick={() => setIsTableOpen(!isTableOpen)}
+									className="flex items-center gap-2 p-2 bg-white rounded-t-lg hover:bg-gray-50"
+								>
+									<FiMessageCircle className="text-xl" />
+									<span className="font-bold">Table Simulation</span>
+									{isTableOpen ? <FiX /> : <FiEye />}
+								</button>
+								{isTableOpen && (
+									<div className="flex-1">
+										<CustomTable
+											caches={caches}
+											cacheType={mode}
+											cacheResult={cacheResult}
+											associativity={cacheConfig.associativity}
+											actionToIndex={actionToIndex}
+											action={action}
+											actionWay={simState.way}
+											writePolicy={cacheConfig.writePolicy}
+											iconAction={
+												action === "SEARCH" ? (
+													<FiEye />
+												) : action === "WRITE" ? (
+													<FiPlus />
+												) : action === "REPLACE" ? (
+													<FiRepeat />
+												) : null
+											}
+										/>
+									</div>
+								)}
 							</div>
 						</div>
 					</div>
 				</main>
-				<div className="relative">
-					<div className="my-4 flex flex-col gap-2 absolute top-0">
-						<SimulationControls
-							onReset={handleReset}
-							onPrevious={handlePreviousStep}
-							onNext={handleNextStep}
-							onFastForward={handleFastForward}
-						/>
-						{/* Messages */}
-						<div className="min-h-48">
+				<div className="my-4 flex flex-col gap-2 shadow-lg z-10">
+					{/* Toggle Button */}
+					<button
+						type="button"
+						onClick={() => setIsMessageLogOpen(!isMessageLogOpen)}
+						className="flex items-center gap-2 p-2 bg-white rounded-t-lg hover:bg-gray-50"
+					>
+						<FiMessageCircle className="text-xl" />
+						<span className="font-bold">Message Log</span>
+						{isMessageLogOpen ? <FiX /> : <FiEye />}
+					</button>
+
+					{/* Messages */}
+					{isMessageLogOpen && (
+						<div className="bg-white rounded-b-lg max-h-64 overflow-y-auto">
 							{messageLog
 								.filter((_, i) => i === currentStep - 1)
 								.map((msgs, i) => (
 									<div
 										// biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
 										key={i}
-										className="mt-4 bg-white rounded-xl h-full w-fit"
+										className="p-4 border-b border-gray-100"
 									>
-										<div className="flex flex-col gap-2 p-4">
+										<div className="flex flex-col gap-2">
 											<div className="flex gap-1 items-center">
 												<FiMessageCircle className="text-xl" />
 												<span className="font-bold">COMCACHE</span>
 											</div>
 											<div className="whitespace-pre-line">
 												<p className="px-4 font-medium">{msgs[0]}</p>
-												{msgs.slice(1).map((msg, j) => {
-													return (
-														// biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
-														<p key={j} className="mt-2 px-4 text-gray-600">
-															{msg}
-														</p>
-													);
-												})}
+												{msgs.slice(1).map((msg, j) => (
+													// biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
+													<p key={j} className="mt-2 px-4 text-gray-600">
+														{msg}
+													</p>
+												))}
 											</div>
 										</div>
 									</div>
 								))}
 						</div>
-					</div>
+					)}
 				</div>
 			</div>
 		</>

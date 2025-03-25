@@ -350,14 +350,21 @@ const useSimStore = create((set, get) => ({
 
 	/*** SIMULATION STEPS ***/
 	// --- DIRECT MAPPED STEPS ---
-	// --- DIRECT MAPPED STEPS ---
 	directMappedSteps: [
 		{
 			label: "Parse Address",
-			preMessage: (state) =>
-				`🔍 Current Address: ${state.address}\nWe split the address into three parts:\n• Tag (${get().destructuringCache().tagSize} bits): Uniquely identifies the memory block.\n• Index (${get().destructuringCache().indexSize} bits): Determines the cache line.\n• Offset (${get().destructuringCache().offsetSize} bits): Pinpoints the exact byte in that line.`,
-			actionMessage: (state) =>
-				`📍 Mapping Complete:\nData will be stored in cache line at Index: ${state.index} with Tag: ${state.tag}.`,
+			preMessage: (state) => {
+				return `🔍 Address Parsing:
+				Current Address: ${state.address}
+				The address is divided into:
+				• Tag (${get().destructuringCache().tagSize} bits): Identifies the memory block
+				• Index (${get().destructuringCache().indexSize} bits): Selects the cache line
+				• Offset (${get().destructuringCache().offsetSize} bits): Locates the byte within the line`;
+			},
+			actionMessage: (state) => {
+				return `📍 Address Mapping:
+				Assigned Cache Line at Index: ${state.index} with Tag: ${state.tag}`;
+			},
 			action: (state) => {
 				const { offset, index, tag, data } = get().destructuringAddress(
 					state.address,
@@ -368,11 +375,11 @@ const useSimStore = create((set, get) => ({
 		{
 			label: "Check Cache Line",
 			preMessage: (state) =>
-				`🔍 Inspecting cache line ${state.index} to see if it contains a valid block with Tag: ${state.tag}.`,
+				`🔍 Checking Cache Line ${state.index} for valid block with Tag: ${state.tag}.`,
 			actionMessage: (state) =>
 				state.cacheResult === "HIT"
-					? "✅ Cache Hit: The stored tag matches, so the data is already in the cache."
-					: "❌ Cache Miss: The tag does not match; the data must be fetched from memory.",
+					? "✅ Cache Hit: Data is found in the cache."
+					: "❌ Cache Miss: No matching tag; data will be retrieved from memory.",
 			action: (state) => {
 				set(() => ({ action: "SEARCH", actionToIndex: state.index }));
 				const cache = state.caches.find((c) => c.index === state.index);
@@ -393,13 +400,12 @@ const useSimStore = create((set, get) => ({
 		{
 			label: "Handle Hit or Miss",
 			preMessage: () =>
-				"🔄 Evaluating whether the cache lookup resulted in a hit or a miss, and applying the appropriate response.",
+				"🔄 Evaluating cache result to determine subsequent action.",
 			actionMessage: (state) =>
 				state.cacheResult === "HIT"
-					? `⚡ Cache Hit: Fast access achieved in ${get().cacheConfig.hitTime} cycle(s).`
-					: `😮 Cache Miss: Data retrieval from memory will incur ${get().cacheConfig.missPenalty} cycle penalty.`,
+					? `⚡ Cache Hit: Fast access in ${get().cacheConfig.hitTime} cycle(s).`
+					: `😮 Cache Miss: Memory access incurs a penalty of ${get().cacheConfig.missPenalty} cycle(s).`,
 			action: (state) => {
-				// (Your logic to update the cache state and performance metrics)
 				let newCaches = state.caches;
 				if (state.cacheResult === "HIT") {
 					newCaches = state.caches.map((cache) =>
@@ -426,7 +432,6 @@ const useSimStore = create((set, get) => ({
 									tag: "outdated",
 									data: "outdated",
 									offset: "outdated",
-
 									dirtyBit: false,
 								}
 							: cache,
@@ -441,6 +446,7 @@ const useSimStore = create((set, get) => ({
 						totalWrites: prev.totalWrites + 1,
 					}));
 				} else {
+					// MISS
 					newCaches = state.caches.map((cache) =>
 						cache.index === state.index
 							? {
@@ -468,8 +474,14 @@ const useSimStore = create((set, get) => ({
 		},
 		{
 			label: "Write or Update Cache Line",
-			preMessage: () =>
-				"💾 Now we update the cache with the new data, either by writing fresh data or replacing outdated information.",
+			preMessage: () => {
+				const writePolicy = get().cacheConfig.writePolicy;
+				const writePolicyMsg =
+					writePolicy === "WRITE_BACK"
+						? " (Write-Back: Writes are deferred until replacement)"
+						: " (Write-Through: Writes update memory immediately)";
+				return `💾 Updating Cache Line:${writePolicyMsg}`;
+			},
 			actionMessage: (state) =>
 				state.cacheResult === "REPLACE"
 					? `🔄 Replacing data in cache line ${state.index}.`
@@ -500,20 +512,14 @@ const useSimStore = create((set, get) => ({
 		{
 			label: "Finish",
 			preMessage: () =>
-				"🏁 Wrapping up the simulation and summarizing the performance metrics.",
+				"🏁 Finalizing simulation and compiling performance metrics.",
 			actionMessage: () =>
-				`🎉 Direct-Mapped Simulation Complete!\nHit Rate: ${(get().performanceMetrics.hitRate * 100).toFixed(1)}% (Hits: ${get().countCacheResult.hit} / Total: ${get().countCacheResult.hit + get().countCacheResult.miss})`,
+				`🎉 Direct-Mapped Simulation Complete!
+Hit Rate: ${(get().performanceMetrics.hitRate * 100).toFixed(1)}% (Hits: ${get().countCacheResult.hit} / Total: ${get().countCacheResult.hit + get().countCacheResult.miss})`,
 			action: (state) => {
 				get().updatePerformanceMetrics();
-				set(() => ({
-					cacheResult: null,
-					action: null,
-					actionToIndex: null,
-				}));
-				return {
-					...state,
-					message: "Direct mapped simulation completed.",
-				};
+				set(() => ({ cacheResult: null, action: null, actionToIndex: null }));
+				return { ...state, message: "Direct-mapped simulation completed." };
 			},
 		},
 	],
@@ -522,10 +528,18 @@ const useSimStore = create((set, get) => ({
 	setAssociativeSteps: [
 		{
 			label: "Parse Address",
-			preMessage: (state) =>
-				`🔢 Current Address: ${state.address}\nWe break down the address into:\n• Tag – Identifies the memory block.\n• Set Index – Determines which set (of ${get().destructuringCache().numSets}) stores the data.\n• Offset – Pinpoints the data's exact position within the cache line.`,
-			actionMessage: (state) =>
-				`📌 Mapping Complete:\nData is assigned to Set ${state.index} with Tag: ${state.tag}.`,
+			preMessage: (state) => {
+				return `🔢 Address Breakdown:
+				Current Address: ${state.address}
+				Components:
+				• Tag – Identifies the memory block
+				• Set Index – Determines the set (of ${get().destructuringCache().numSets})
+				• Offset – Locates data within the line`;
+			},
+			actionMessage: (state) => {
+				return `📌 Mapping Complete:
+				Assigned to Set: ${state.index} with Tag: ${state.tag}`;
+			},
 			action: (state) => {
 				const { offset, index, tag, data } = get().destructuringAddress(
 					state.address,
@@ -536,11 +550,11 @@ const useSimStore = create((set, get) => ({
 		{
 			label: "Check Cache Line",
 			preMessage: (state) =>
-				`🔍 Examining all ${get().cacheConfig.associativity} ways in Set ${state.index} for a matching Tag: ${state.tag}.`,
+				`🔍 Scanning all ${get().cacheConfig.associativity} ways in Set ${state.index} for Tag: ${state.tag}.`,
 			actionMessage: (state) =>
 				state.cacheResult === "HIT"
-					? `✅ Cache Hit: Data found in way ${state.way}!`
-					: "❌ Cache Miss: No valid entry matches the tag in this set.",
+					? `✅ Cache Hit: Data found in way ${state.way}.`
+					: "❌ Cache Miss: No matching entry found in this set.",
 			action: (state) => {
 				set(() => ({ action: "SEARCH", actionToIndex: state.index }));
 				const setCache = state.caches.find((c) => c.index === state.index);
@@ -560,25 +574,15 @@ const useSimStore = create((set, get) => ({
 					);
 					if (availableWayIndex !== -1) {
 						set((prev) => ({ readMisses: prev.readMisses + 1 }));
-						return {
-							...state,
-							cacheResult: "MISS",
-							way: availableWayIndex,
-						};
+						return { ...state, cacheResult: "MISS", way: availableWayIndex };
 					}
-					set((prev) => ({
-						writeMisses: prev.writeMisses + 1,
-					}));
+					set((prev) => ({ writeMisses: prev.writeMisses + 1 }));
 					const lruWayIndex = setCache.ways.reduce(
 						(lruIndex, way, idx, ways) =>
 							way.lastAccess < ways[lruIndex].lastAccess ? idx : lruIndex,
 						0,
 					);
-					return {
-						...state,
-						cacheResult: "REPLACE",
-						way: lruWayIndex,
-					};
+					return { ...state, cacheResult: "REPLACE", way: lruWayIndex };
 				}
 				return state;
 			},
@@ -586,13 +590,13 @@ const useSimStore = create((set, get) => ({
 		{
 			label: "Handle Hit or Miss",
 			preMessage: () =>
-				"🔄 Now we evaluate the lookup: Was it a hit, a miss, or is a replacement needed?",
+				"🔄 Evaluating lookup outcome to decide whether to refresh or update the cache.",
 			actionMessage: (state) =>
 				state.cacheResult === "REPLACE"
-					? "♻ Replacing LRU Entry: The least-recently-used slot will be replaced."
+					? "♻ Replacing LRU Entry."
 					: state.cacheResult === "MISS"
-						? "➕ Empty Way Found: Data will be added to the available slot."
-						: "📈 Cache Hit: Refreshing the access time for the matching entry.",
+						? "➕ Empty Way Found: Data will be added."
+						: "📈 Cache Hit: Refreshing access time.",
 			action: (state) => {
 				set((prev) => ({ ...prev, cacheResult: state.cacheResult }));
 				if (state.cacheResult === "HIT") {
@@ -602,10 +606,7 @@ const useSimStore = create((set, get) => ({
 									...cache,
 									ways: cache.ways.map((way, i) =>
 										i === state.way
-											? {
-													...way,
-													lastAccess: get().accessCounter,
-												}
+											? { ...way, lastAccess: get().accessCounter }
 											: way,
 									),
 								}
@@ -653,6 +654,7 @@ const useSimStore = create((set, get) => ({
 					}));
 					return { ...state, caches: newCaches };
 				}
+				// MISS handling
 				const newCaches = state.caches.map((cache) =>
 					cache.index === state.index
 						? {
@@ -685,14 +687,20 @@ const useSimStore = create((set, get) => ({
 		},
 		{
 			label: "Write or Update Cache Line",
-			preMessage: (state) =>
-				state.cacheResult === "REPLACE"
-					? `💾 Preparing to replace outdated data in Set ${state.index} at way ${state.way}.`
-					: state.cacheResult === "MISS"
-						? `💾 Preparing to write new data into Set ${state.index} at way ${state.way}.`
-						: "💾 Updating the cache entry to refresh its access time.",
+			preMessage: () => {
+				const writePolicy = get().cacheConfig.writePolicy;
+				const writePolicyMsg =
+					writePolicy === "WRITE_BACK"
+						? " (Write-Back: Writes are deferred until replacement)"
+						: " (Write-Through: Writes update memory immediately)";
+				return `💾 Updating Cache Line:${writePolicyMsg}`;
+			},
 			actionMessage: (state) =>
-				`💡 Set-Associative Update:\nUsage in Set ${state.index}: ${state.caches[state.index].ways.filter((w) => w.valid).length} of ${get().cacheConfig.associativity} ways occupied.`,
+				state.cacheResult === "REPLACE"
+					? `🔄 Replacing data in Set ${state.index}, Way ${state.way}.`
+					: state.cacheResult === "MISS"
+						? `💾 Writing new data into Set ${state.index}, Way ${state.way}.`
+						: "💾 Updating cache entry to refresh access time.",
 			action: (state) => {
 				set(() => ({
 					cacheResult: "HIT",
@@ -728,16 +736,14 @@ const useSimStore = create((set, get) => ({
 		{
 			label: "Finish",
 			preMessage: () =>
-				"🏁 Finalizing the simulation and summarizing key performance metrics.",
-			actionMessage: () =>
-				`🏁 Set-Associative Simulation Complete!\nAvg Access Time: ${get().performanceMetrics.avgAccessTime.toFixed(2)} cycles\n(Calculated as: Hit Time + Miss Rate × Miss Penalty)`,
+				"🏁 Finalizing simulation and compiling performance metrics.",
+			actionMessage: (state) =>
+				`🏁 Set-Associative Simulation Complete!
+				Average Access Time: ${get().performanceMetrics.avgAccessTime.toFixed(2)} cycles
+				(Computed as: Hit Time + Miss Rate × Miss Penalty)`,
 			action: (state) => {
 				get().updatePerformanceMetrics();
-				set(() => ({
-					cacheResult: null,
-					action: null,
-					actionToIndex: null,
-				}));
+				set(() => ({ cacheResult: null, action: null, actionToIndex: null }));
 				return { ...state };
 			},
 		},
@@ -747,26 +753,33 @@ const useSimStore = create((set, get) => ({
 	fullyAssociativeSteps: [
 		{
 			label: "Parse Address",
-			preMessage: (state) =>
-				`🌐 Current Address: ${state.address}\nSince the cache is treated as a single set, we only extract:\n• Tag (${get().destructuringCache().tagSize} bits): Uniquely identifies the memory block.\n• Offset: Pinpoints the exact data location within the block.`,
-			actionMessage: (state) =>
-				`🔑 Mapping Complete:\nData identified with Tag: ${state.tag} and assigned to the cache set.`,
+			preMessage: (state) => {
+				return `🌐 Address Parsing:
+				Current Address: ${state.address}
+				For fully associative caches, we extract:
+				• Tag (${get().destructuringCache().tagSize} bits): Identifies the memory block
+				• Offset: Locates data within the block`;
+			},
+			actionMessage: (state) => {
+				return `🔑 Mapping Complete:
+				Data tagged as ${state.tag} is assigned to the cache.`;
+			},
 			action: (state) => {
 				const { offset, tag, data } = get().destructuringAddress(state.address);
+				// For fully associative, use a single set (index = 0)
 				return { ...state, offset, index: 0, tag, data };
 			},
 		},
 		{
 			label: "Check Cache Line",
-			preMessage: (state) =>
-				`🔍 Checking every slot in the cache for a matching Tag: ${state.tag}.`,
+			preMessage: (state) => `🔍 Scanning all slots for Tag: ${state.tag}.`,
 			actionMessage: (state) =>
 				state.cacheResult === "HIT"
-					? "🎯 Cache Hit: Data found in the cache!"
+					? "🎯 Cache Hit: Data is present in the cache."
 					: "🌌 Cache Miss: No matching entry found; data will be fetched from memory.",
 			action: (state) => {
 				set(() => ({ action: "SEARCH", actionToIndex: 0 }));
-				const cacheSet = get().caches[0]; // only one set exists
+				const cacheSet = get().caches[0]; // single set for fully associative
 				if (cacheSet) {
 					const hitWay = cacheSet.ways.find(
 						(way) => way.valid && way.tag === state.tag,
@@ -783,25 +796,15 @@ const useSimStore = create((set, get) => ({
 					);
 					if (availableWayIndex !== -1) {
 						set((prev) => ({ readMisses: prev.readMisses + 1 }));
-						return {
-							...state,
-							cacheResult: "MISS",
-							way: availableWayIndex,
-						};
+						return { ...state, cacheResult: "MISS", way: availableWayIndex };
 					}
-					set((prev) => ({
-						writeMisses: prev.writeMisses + 1,
-					}));
+					set((prev) => ({ writeMisses: prev.writeMisses + 1 }));
 					const lruWayIndex = cacheSet.ways.reduce(
 						(lruIndex, way, idx, ways) =>
 							way.lastAccess < ways[lruIndex].lastAccess ? idx : lruIndex,
 						0,
 					);
-					return {
-						...state,
-						cacheResult: "REPLACE",
-						way: lruWayIndex,
-					};
+					return { ...state, cacheResult: "REPLACE", way: lruWayIndex };
 				}
 				return state;
 			},
@@ -809,11 +812,11 @@ const useSimStore = create((set, get) => ({
 		{
 			label: "Handle Hit or Miss",
 			preMessage: () =>
-				"🔄 Evaluating whether the data retrieval was successful (hit) or if an update is needed.",
+				"🔄 Evaluating cache lookup outcome to determine next action.",
 			actionMessage: (state) =>
 				state.cacheResult === "REPLACE"
-					? "⏳ Replacing Old Entry: Updating the cache using the LRU policy."
-					: "🆕 Updating Cache: Either adding new data or refreshing an existing entry.",
+					? "⏳ Replacing the least-recently-used entry."
+					: "🆕 Updating cache: Adding new data or refreshing an existing entry.",
 			action: (state) => {
 				set((prev) => ({ ...prev, cacheResult: state.cacheResult }));
 				if (state.cacheResult === "HIT") {
@@ -823,10 +826,7 @@ const useSimStore = create((set, get) => ({
 									...cache,
 									ways: cache.ways.map((way, i) =>
 										i === state.way
-											? {
-													...way,
-													lastAccess: get().accessCounter,
-												}
+											? { ...way, lastAccess: get().accessCounter }
 											: way,
 									),
 								}
@@ -874,6 +874,7 @@ const useSimStore = create((set, get) => ({
 					}));
 					return { ...state, caches: newCaches };
 				}
+				// MISS handling
 				const newCaches = state.caches.map((cache) =>
 					cache.index === state.index
 						? {
@@ -906,10 +907,17 @@ const useSimStore = create((set, get) => ({
 		},
 		{
 			label: "Write or Update Cache Line",
-			preMessage: () =>
-				"💾 Updating the cache with new data or replacing outdated data as needed.",
+			preMessage: () => {
+				const writePolicy = get().cacheConfig.writePolicy;
+				const writePolicyMsg =
+					writePolicy === "WRITE_BACK"
+						? " (Write-Back: Writes are deferred until replacement)"
+						: " (Write-Through: Writes update memory immediately)";
+				return `💾 Updating Cache Line:${writePolicyMsg}`;
+			},
 			actionMessage: (state) =>
-				`📊 Cache Write:\nCache usage: ${state.caches[0].ways.filter((w) => w.valid).length} of ${state.caches[0].ways.length} slots used.`,
+				`📊 Cache Update:
+				Currently, ${state.caches[0].ways.filter((w) => w.valid).length} of ${state.caches[0].ways.length} slots are occupied.`,
 			action: (state) => {
 				set(() => ({
 					cacheResult: "HIT",
@@ -940,16 +948,14 @@ const useSimStore = create((set, get) => ({
 		{
 			label: "Finish",
 			preMessage: () =>
-				"🏁 Finalizing the simulation and summarizing overall cache performance.",
-			actionMessage: () =>
-				`🚀 Fully Associative Simulation Complete!\nTotal Misses: ${get().countCacheResult.miss}\n(Miss Rate: ${(get().performanceMetrics.missRate * 100).toFixed(1)}%)`,
+				"🏁 Finalizing simulation and compiling performance metrics.",
+			actionMessage: (state) =>
+				`🚀 Fully Associative Simulation Complete!
+				Total Misses: ${get().countCacheResult.miss}
+				(Miss Rate: ${(get().performanceMetrics.missRate * 100).toFixed(1)}%)`,
 			action: (state) => {
 				get().updatePerformanceMetrics();
-				set(() => ({
-					cacheResult: null,
-					action: null,
-					actionToIndex: null,
-				}));
+				set(() => ({ cacheResult: null, action: null, actionToIndex: null }));
 				return { ...state };
 			},
 		},
@@ -978,13 +984,14 @@ const useSimStore = create((set, get) => ({
 			const newState = step.action(currentSimState);
 			const preMsg = step.preMessage ? step.preMessage(newState) : null;
 			const actionMsg = step.actionMessage(newState);
+			const performanceMsg = `📊 Performance Metrics:\n• Hit Rate: ${(get().performanceMetrics.hitRate * 100).toFixed(2)}%\n• Miss Rate: ${(get().performanceMetrics.missRate * 100).toFixed(2)}%\n• Avg Access Time: ${get().performanceMetrics.avgAccessTime.toFixed(2)} cycles`;
 
 			set((state) => {
 				const newMessageLog = [...state.messageLog];
 				if (preMsg) {
-					newMessageLog[currentStep] = [preMsg, actionMsg];
+					newMessageLog[currentStep] = [preMsg, actionMsg, performanceMsg];
 				} else {
-					newMessageLog[currentStep] = ["", actionMsg];
+					newMessageLog[currentStep] = ["", actionMsg, performanceMsg];
 				}
 
 				const updatedState = {
