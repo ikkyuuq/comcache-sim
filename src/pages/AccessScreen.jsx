@@ -1,6 +1,16 @@
+import {
+	CategoryScale,
+	Chart as ChartJS,
+	Legend,
+	LineElement,
+	LinearScale,
+	PointElement,
+	Tooltip,
+} from "chart.js";
 import { motion } from "framer-motion";
 import React from "react";
 import { useEffect, useState } from "react";
+import { Line } from "react-chartjs-2";
 import {
 	FiCheck,
 	FiEye,
@@ -43,18 +53,25 @@ function AccessScreen() {
 		setCurrentStep,
 		clearCompleted,
 		mode,
+		performanceMetrics,
+		performanceMetricsHistory,
 	} = useSimStore();
+
+	const {
+		hitRate,
+		missRate,
+		avgAccessTime,
+		readStallCycle,
+		writeStallCycle,
+		writeMissPenalty,
+		writeBufferStall,
+		cpuTime,
+	} = performanceMetrics;
 
 	const { hit, miss } = countCacheResult;
 	const [hitCount, setHitCount] = useState(hit);
 	const [missCount, setMissCount] = useState(miss);
 
-	useEffect(() => {
-		setHitCount(hit);
-		setMissCount(miss);
-	}, [hit, miss]);
-
-	const [selectedBlock, setSelectedBlock] = useState(null);
 	const addresses = [
 		// Initial fill (3 unique blocks)
 		"00000000", // Block A (Index 0)
@@ -78,6 +95,55 @@ function AccessScreen() {
 		"01000000", // C - MISS (replaces A in 2-Way)
 	];
 
+	ChartJS.register(
+		CategoryScale,
+		LinearScale,
+		LineElement,
+		PointElement,
+		Tooltip,
+		Legend,
+	);
+
+	const options = {
+		responsive: true,
+		maintainAspectRatio: false,
+		scales: {
+			y: {
+				min: 0,
+				max: 1,
+				ticks: {
+					callback: (value) => `${(value * 100).toFixed(0)}%`,
+				},
+			},
+		},
+	};
+	const data = {
+		labels: addresses.map((_, i) => i + 1),
+		datasets: [
+			{
+				label: "Hit Rate",
+				data: performanceMetricsHistory.map((metric) => metric.hitRate),
+				fill: false,
+				borderColor: "#10B981",
+				tension: 0.1,
+			},
+			{
+				label: "Miss Rate",
+				data: performanceMetricsHistory.map((metric) => metric.missRate),
+				fill: false,
+				borderColor: "#EF4444",
+				tension: 0.1,
+			},
+		],
+	};
+
+	useEffect(() => {
+		setHitCount(hit);
+		setMissCount(miss);
+	}, [hit, miss]);
+
+	const [selectedBlock, setSelectedBlock] = useState(null);
+
 	const [currentAddressIndex, setCurrentAddressIndex] = useState(addresses[0]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
@@ -86,7 +152,7 @@ function AccessScreen() {
 		initializeCaches();
 		setAccessAddress(addresses[0]);
 		setCurrentAddressIndex(0);
-	}, [initializeCaches, resetSim, setAccessAddress, mode]);
+	}, [resetSim, initializeCaches, setAccessAddress]);
 
 	const handleReset = () => {
 		resetSim();
@@ -130,9 +196,11 @@ function AccessScreen() {
 	};
 
 	const [modalConfigurationOpen, setModalConfigurationOpen] = useState(false);
+
 	const [isMessageLogOpen, setIsMessageLogOpen] = useState(true);
 	const [isCacheBlocksOpen, setIsCacheBlocksOpen] = useState(true);
 	const [isTableOpen, setIsTableOpen] = useState(true);
+	const [isPerformanceOpen, setIsPerformanceOpen] = useState(true);
 
 	const handleOpenModal = () => {
 		setModalConfigurationOpen(true);
@@ -148,6 +216,7 @@ function AccessScreen() {
 			<header className="flex justify-between items-center">
 				<div className="flex items-center gap-2">
 					<ModalConfig
+						cacheConfig={cacheConfig}
 						CacheTypes={CacheTypes}
 						modalConfigurationOpen={modalConfigurationOpen}
 						setModalConfigurationOpen={setModalConfigurationOpen}
@@ -166,6 +235,27 @@ function AccessScreen() {
 				</div>
 				<div className="flex gap-2">
 					<CacheTypeSelector mode={mode} onChange={handleChangeCacheType} />
+
+					<motion.button
+						onClick={() =>
+							setWritePolicy(
+								cacheConfig.writePolicy === "WRITE_BACK"
+									? "WRITE_THROUGH"
+									: "WRITE_BACK",
+							)
+						}
+						whileHover={{ scale: 1.05 }}
+						whileTap={{ scale: 0.95 }}
+						className={`text-sm px-4 py-2 rounded-lg font-bold ${
+							cacheConfig.writePolicy === "WRITE_BACK"
+								? "bg-black text-white"
+								: "bg-gray-200 text-black"
+						}`}
+					>
+						{cacheConfig.writePolicy === "WRITE_BACK"
+							? "Write Back"
+							: "Write Through"}
+					</motion.button>
 				</div>
 			</header>
 			<div className="w-fit text-sm flex items-center gap-2 bg-white px-4 py-1 rounded-full">
@@ -193,80 +283,156 @@ function AccessScreen() {
 							/>
 						</div>
 						<div className="flex flex-col lg:flex-row w-full gap-4">
-							{/* Cache Blocks */}
-							<div className="flex flex-col gap-2 w-full flex-1">
-								<button
-									type="button"
-									onClick={() => setIsCacheBlocksOpen(!isCacheBlocksOpen)}
-									className="flex items-center gap-2 p-2 bg-white rounded-t-lg hover:bg-gray-50"
-								>
-									<FiMessageCircle className="text-xl" />
-									<span className="font-bold">Cache Blocks</span>
-									{isCacheBlocksOpen ? <FiX /> : <FiEye />}
-								</button>
-								{isCacheBlocksOpen && (
-									<div className="flex-wrap flex flex-col flex-1 gap-2">
-										<motion.div
-											layout
-											transition={{ duration: 0.3, ease: "easeInOut" }}
-											className="flex flex-row gap-2 flex-wrap overflow-x-auto"
-										>
-											{caches.map((block) => (
-												<CacheBlock
-													key={block.index}
-													index={block.index}
-													selected={selectedBlock}
-													actionToIndex={actionToIndex}
-													setSelected={() => setSelectedBlock(block.index)}
-													action={cacheResult}
-													cacheType={mode}
-													contains={caches.find((b) =>
-														mode === CacheTypes.FULLY_ASSOCIATIVE
-															? b.index === block.index &&
-																b.ways.some((w) => w.valid)
-															: mode === CacheTypes.SET_ASSOCIATIVE
-																? b.index === block.index &&
-																	b.ways.find((w) => w.valid)
-																: b.index === block.index && b.valid,
-													)}
-												/>
-											))}
-										</motion.div>
-									</div>
-								)}
+							<div className="flex flex-col w-full gap-4">
+								{/* Cache Blocks */}
+								<div className="flex flex-col gap-2 w-full">
+									<button
+										type="button"
+										onClick={() => setIsCacheBlocksOpen(!isCacheBlocksOpen)}
+										className="flex items-center gap-2 p-2 bg-white rounded-t-lg hover:bg-gray-50"
+									>
+										<FiMessageCircle className="text-xl" />
+										<span className="font-bold">Cache Blocks</span>
+										{isCacheBlocksOpen ? <FiX /> : <FiEye />}
+									</button>
+									{isCacheBlocksOpen && (
+										<div className="flex-wrap flex flex-col flex-1 gap-2">
+											<motion.div
+												layout
+												transition={{ duration: 0.3, ease: "easeInOut" }}
+												className="flex flex-row gap-2 flex-wrap overflow-x-auto"
+											>
+												{caches.map((block) => {
+													return (
+														<CacheBlock
+															key={block.index}
+															index={block.index}
+															selected={selectedBlock}
+															actionToIndex={actionToIndex}
+															setSelected={() => setSelectedBlock(block.index)}
+															action={cacheResult}
+															cacheType={mode}
+															contains={caches.find((b) =>
+																mode === CacheTypes.FULLY_ASSOCIATIVE
+																	? b.index === block.index &&
+																		b.ways.some((w) => w.valid)
+																	: mode === CacheTypes.SET_ASSOCIATIVE
+																		? b.index === block.index &&
+																			b.ways.find((w) => w.valid)
+																		: b.index === block.index && b.valid,
+															)}
+														/>
+													);
+												})}
+											</motion.div>
+										</div>
+									)}
+								</div>
+								{/* Table Simulation */}
+								<div className="flex flex-col gap-2 w-full flex-1 min-w-64 ">
+									<button
+										type="button"
+										onClick={() => setIsTableOpen(!isTableOpen)}
+										className="flex items-center gap-2 p-2 bg-white rounded-t-lg hover:bg-gray-50"
+									>
+										<FiMessageCircle className="text-xl" />
+										<span className="font-bold">Table Simulation</span>
+										{isTableOpen ? <FiX /> : <FiEye />}
+									</button>
+									{isTableOpen && (
+										<div className="flex-1">
+											<CustomTable
+												caches={caches}
+												cacheConfig={cacheConfig}
+												cacheType={mode}
+												cacheResult={cacheResult}
+												associativity={cacheConfig.associativity}
+												actionToIndex={actionToIndex}
+												action={action}
+												actionWay={simState.way}
+												writePolicy={cacheConfig.writePolicy}
+												iconAction={
+													action === "SEARCH" ? (
+														<FiEye />
+													) : action === "WRITE" ? (
+														<FiPlus />
+													) : action === "REPLACE" ? (
+														<FiRepeat />
+													) : null
+												}
+											/>
+										</div>
+									)}
+								</div>
 							</div>
-							{/* Table Simulation */}
-							<div className="flex flex-col gap-2 w-full flex-1 min-w-64 lg:max-w-2xl flex-1">
+
+							{/* Cache Performance Overview */}
+							<div className="flex flex-col gap-2 w-full lg:max-w-xl flex-1 h-fit">
 								<button
 									type="button"
-									onClick={() => setIsTableOpen(!isTableOpen)}
+									onClick={() => setIsPerformanceOpen(!isPerformanceOpen)}
 									className="flex items-center gap-2 p-2 bg-white rounded-t-lg hover:bg-gray-50"
 								>
 									<FiMessageCircle className="text-xl" />
-									<span className="font-bold">Table Simulation</span>
-									{isTableOpen ? <FiX /> : <FiEye />}
+									<span className="font-bold">Performances</span>
+									{isPerformanceOpen ? <FiX /> : <FiEye />}
 								</button>
-								{isTableOpen && (
-									<div className="flex-1">
-										<CustomTable
-											caches={caches}
-											cacheType={mode}
-											cacheResult={cacheResult}
-											associativity={cacheConfig.associativity}
-											actionToIndex={actionToIndex}
-											action={action}
-											actionWay={simState.way}
-											writePolicy={cacheConfig.writePolicy}
-											iconAction={
-												action === "SEARCH" ? (
-													<FiEye />
-												) : action === "WRITE" ? (
-													<FiPlus />
-												) : action === "REPLACE" ? (
-													<FiRepeat />
-												) : null
-											}
-										/>
+								{isPerformanceOpen && (
+									<div className="bg-white h-fit flex-1 rounded-lg shadow-sm border border-gray-100 p-4 overflow-x-auto">
+										<div>
+											<Line data={data} options={options} />
+										</div>
+										{/* Hit/Miss Rate Cards */}
+										<div className="flex gap-4 mb-6">
+											<div className="flex-1 bg-emerald-50 rounded-lg p-4 border border-emerald-100">
+												<div className="text-3xl font-semibold text-emerald-600 mb-1">
+													{Number.parseFloat(hitRate * 100).toFixed(4)}%
+												</div>
+												<div className="text-xs font-medium text-emerald-500">
+													Hit Rate
+												</div>
+											</div>
+
+											<div className="flex-1 bg-rose-50 rounded-lg p-4 border border-rose-100">
+												<div className="text-3xl font-semibold text-rose-600 mb-1">
+													{Number.parseFloat(missRate * 100).toFixed(4)}%
+												</div>
+												<div className="text-xs font-medium text-rose-500">
+													Miss Rate
+												</div>
+											</div>
+										</div>
+
+										{/* AMAT Card */}
+										<div className="bg-gray-50 rounded-lg p-4 mb-6 text-center">
+											<div className="text-2xl font-semibold text-gray-700 mb-1">
+												{Number.parseFloat(avgAccessTime).toFixed(4)}
+											</div>
+											<div className="text-sm text-gray-500">
+												Average Access Memory Time (AMAT)
+											</div>
+										</div>
+
+										{/* Stall Cycles */}
+										<div className="flex gap-4 mb-6">
+											<div className="flex-1 rounded-lg p-3 bg-blue-50 border border-blue-100">
+												<div className="text-xl font-medium text-blue-600 mb-1">
+													{Number.parseInt(readStallCycle)}
+												</div>
+												<div className="text-xs text-blue-500">
+													Read Stall Cycles
+												</div>
+											</div>
+
+											<div className="flex-1 rounded-lg p-3 bg-indigo-50 border border-indigo-100">
+												<div className="text-xl font-medium text-indigo-600 mb-1">
+													{Number.parseInt(writeStallCycle)}
+												</div>
+												<div className="text-xs text-indigo-500">
+													Write Stall Cycles
+												</div>
+											</div>
+										</div>
 									</div>
 								)}
 							</div>

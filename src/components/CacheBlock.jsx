@@ -12,13 +12,13 @@ function CacheBlock({
 }) {
 	const animatedWidth = {
 		selected: {
-			width: 64 * 2 + 10,
+			width: cacheType === "SET_ASSOCIATIVE" ? 120 : 64 * 2 + 10,
 			transition: {
 				duration: 0.3,
 			},
 		},
 		unselected: {
-			width: 64,
+			width: cacheType === "SET_ASSOCIATIVE" ? 80 : 64,
 			transition: {
 				duration: 0.5,
 			},
@@ -89,8 +89,19 @@ function CacheBlock({
 				style={{ userSelect: "none" }}
 				className="font-bold w-full h-full bg-gray-200 rounded-lg flex items-center justify-center"
 			>
-				{selectedPrefix}
-				{index}
+				{cacheType === "SET_ASSOCIATIVE" ? (
+					<div className="flex flex-col items-center">
+						<span>
+							{selectedPrefix}
+							{index}
+						</span>
+					</div>
+				) : (
+					<>
+						{selectedPrefix}
+						{index}
+					</>
+				)}
 			</motion.div>
 		</motion.div>
 	);

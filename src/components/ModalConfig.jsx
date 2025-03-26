@@ -12,6 +12,7 @@ import useSimStore from "../hooks/store";
 import PresetMotionButton from "./PresetMotionButton";
 
 function ModalConfig({
+	cacheConfig,
 	CacheTypes,
 	modalConfigurationOpen,
 	setModalConfigurationOpen,
@@ -26,7 +27,6 @@ function ModalConfig({
 		busLatencyOptions,
 		memoryConfig,
 		cpuConfig,
-		cacheConfig,
 		resetSim,
 		mode,
 		setConfig,
@@ -38,14 +38,33 @@ function ModalConfig({
 	const [cpuConfigs, setCpuConfigs] = useState(cpuConfig);
 
 	const [preset, setPreset] = useState(null);
+	const [isConfigValid, setIsConfigValid] = useState(true);
+	const [errorMessage, setErrorMessage] = useState("");
+
+	const validateConfig = (config) => {
+		const { cacheSize, blockSize, bitAddress } = config;
+		if (blockSize > cacheSize) {
+			setErrorMessage("Block size cannot exceed cache size.");
+			return false;
+		}
+		if (bitAddress ** 2 < cacheSize / blockSize) {
+			setErrorMessage(
+				"Bit address is too small for the given cache and block size.",
+			);
+			return false;
+		}
+		setErrorMessage("");
+		return true;
+	};
 
 	useEffect(() => {
-		console.log(cacheConfigs.associativity);
 		setCacheConfigs((prev) => ({
 			...prev,
 			associativity:
 				mode === CacheTypes.SET_ASSOCIATIVE
-					? cacheConfigs.associativity || 2
+					? cacheConfigs.associativity >= 2
+						? cacheConfigs.associativity
+						: 2
 					: mode === CacheTypes.FULLY_ASSOCIATIVE
 						? cacheConfigs.cacheSize / cacheConfigs.blockSize
 						: 1,
@@ -70,7 +89,6 @@ function ModalConfig({
 					? cacheConfigs.cacheSize / cacheConfigs.blockSize
 					: 1;
 
-		console.log(newAssociativity);
 		setCacheConfigs((prev) => ({
 			...prev,
 			associativity: newAssociativity,
@@ -78,6 +96,9 @@ function ModalConfig({
 		resetSim();
 	};
 	const handleConfirmChangeConfiguration = () => {
+		if (!validateConfig(cacheConfigs)) {
+			return;
+		}
 		setConfig({
 			cacheConfig: cacheConfigs,
 			memoryConfig: memoryConfigs,
@@ -85,6 +106,27 @@ function ModalConfig({
 		});
 		setModalConfigurationOpen(false);
 	};
+
+	// Always find the minimun value for each field
+
+	useEffect(() => {
+		const availableBitAddress = bitAddressOptions.filter(
+			(v) => v ** 2 >= cacheConfigs.cacheSize / cacheConfigs.blockSize,
+		);
+		setCacheConfigs((prev) => {
+			const minimumBitAddress = Math.min(...availableBitAddress);
+			const minimunAssociativity = Math.min(...availableBitAddress);
+			console.log("min", minimumBitAddress);
+			return {
+				...prev,
+				bitAddress:
+					prev.bitAddress > minimumBitAddress
+						? prev.bitAddress
+						: minimumBitAddress,
+			};
+		});
+	}, [cacheConfigs.blockSize, cacheConfigs.cacheSize, bitAddressOptions]);
+
 	return (
 		<Modal
 			className="w-full"
@@ -113,8 +155,13 @@ function ModalConfig({
 							>
 								{bitAddressOptions.map((v, i) => {
 									return (
-										// biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
-										<MenuItem key={i} value={v}>
+										<MenuItem
+											disabled={
+												v ** 2 < cacheConfigs.cacheSize / cacheConfigs.blockSize
+											}
+											key={i}
+											value={v}
+										>
 											{v}
 										</MenuItem>
 									);
@@ -140,7 +187,11 @@ function ModalConfig({
 									{cacheSizeOptions.map((v, i) => {
 										return (
 											// biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
-											<MenuItem key={i} value={v}>
+											<MenuItem
+												disabled={v < cacheConfigs.blockSize}
+												key={i}
+												value={v}
+											>
 												{v}
 											</MenuItem>
 										);
@@ -166,7 +217,11 @@ function ModalConfig({
 									{blockSizeOptions.map((v, i) => {
 										return (
 											<MenuItem
-												disabled={v > cacheConfigs.cacheSize}
+												disabled={
+													v > cacheConfigs.cacheSize ||
+													(mode === CacheTypes.SET_ASSOCIATIVE &&
+														cacheConfigs.cacheSize / v === 1)
+												}
 												// biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
 												key={i}
 												value={v}
@@ -386,10 +441,16 @@ function ModalConfig({
 							/>
 						</div>
 					</div>
+					{errorMessage && (
+						<div className="text-red-500 text-sm mb-2">{errorMessage}</div>
+					)}
 					<button
 						type="button"
 						onClick={handleConfirmChangeConfiguration}
-						className="bg-black text-white p-3 rounded-lg hover:bg-zinc-800 cursor-pointer"
+						className={`bg-black text-white p-3 rounded-lg hover:bg-zinc-800 cursor-pointer ${
+							!isConfigValid ? "opacity-50 cursor-not-allowed" : ""
+						}`}
+						disabled={!isConfigValid}
 					>
 						Confirm
 					</button>
