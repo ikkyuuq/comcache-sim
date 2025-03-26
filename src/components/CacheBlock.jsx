@@ -12,13 +12,13 @@ function CacheBlock({
 }) {
 	const animatedWidth = {
 		selected: {
-			width: cacheType === "SET_ASSOCIATIVE" ? 120 : 64 * 2 + 10,
+			width: cacheType === "SET_ASSOCIATIVE" ? 128 * 1.2 : 64 * 2 + 10,
 			transition: {
 				duration: 0.3,
 			},
 		},
 		unselected: {
-			width: cacheType === "SET_ASSOCIATIVE" ? 80 : 64,
+			width: cacheType === "SET_ASSOCIATIVE" ? 128 : 64,
 			transition: {
 				duration: 0.5,
 			},

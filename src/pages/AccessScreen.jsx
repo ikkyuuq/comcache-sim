@@ -51,6 +51,7 @@ function AccessScreen() {
 		countCacheResult,
 		setMode,
 		setCurrentStep,
+		setWritePolicy,
 		clearCompleted,
 		mode,
 		performanceMetrics,
@@ -66,34 +67,15 @@ function AccessScreen() {
 		writeMissPenalty,
 		writeBufferStall,
 		cpuTime,
+		memoryWrites,
+		energyConsumption,
 	} = performanceMetrics;
 
 	const { hit, miss } = countCacheResult;
 	const [hitCount, setHitCount] = useState(hit);
 	const [missCount, setMissCount] = useState(miss);
 
-	const addresses = [
-		// Initial fill (3 unique blocks)
-		"00000000", // Block A (Index 0)
-		"00100000", // Block B (Index 0)
-		"01000000", // Block C (Index 0)
-
-		// LRU order: A(1) → B(2) → C(3)
-		"00000000", // Re-access A - becomes MRU (Direct: MISS, 2-Way: HIT)
-		"00100000", // Re-access B - becomes MRU (Direct: MISS, 2-Way: HIT)
-
-		// Force replacement
-		"01100000", // Block D (Index 0) - replaces LRU (C) in 2-Way
-
-		// Verify replacements
-		"01000000", // C - MISS in both (was replaced)
-		"00000000", // A - HIT in 2-Way (still present), MISS in Direct
-		"00100000", // B - HIT in 2-Way (still present), MISS in Direct
-
-		// Final LRU test
-		"01100000", // D - HIT in 2-Way (now MRU)
-		"01000000", // C - MISS (replaces A in 2-Way)
-	];
+	const [addresses, setAddresses] = useState([]);
 
 	ChartJS.register(
 		CategoryScale,
@@ -196,6 +178,8 @@ function AccessScreen() {
 	};
 
 	const [modalConfigurationOpen, setModalConfigurationOpen] = useState(false);
+	const [showAddressInput, setShowAddressInput] = useState(false);
+	const [addressInput, setAddressInput] = useState("");
 
 	const [isMessageLogOpen, setIsMessageLogOpen] = useState(true);
 	const [isCacheBlocksOpen, setIsCacheBlocksOpen] = useState(true);
@@ -213,6 +197,47 @@ function AccessScreen() {
 
 	return (
 		<>
+			{showAddressInput && (
+				<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+					<div className="bg-white p-4 rounded-lg w-96">
+						<h2 className="text-lg font-bold mb-2">Enter Addresses</h2>
+						<input
+							type="text"
+							placeholder="e.g., 22, 34, 22, 0, 1"
+							className="w-full p-2 border rounded mb-2"
+							value={addressInput}
+							onChange={(e) => setAddressInput(e.target.value)}
+						/>
+						<div className="flex justify-end gap-2">
+							<button
+								type="button"
+								className="px-4 py-1 bg-gray-200 rounded-lg"
+								onClick={() => setShowAddressInput(false)}
+							>
+								Cancel
+							</button>
+							<button
+								type="button"
+								className="px-4 py-1 bg-blue-500 text-white rounded-lg"
+								onClick={() => {
+									const numbers = addressInput
+										.split(",")
+										.map((num) => Number.parseInt(num.trim(), 10));
+									const binaryAddresses = numbers.map((num) =>
+										num.toString(2).padStart(cacheConfig.bitAddress, "0"),
+									);
+									setAddresses(binaryAddresses);
+									setShowAddressInput(false);
+
+									handleReset();
+								}}
+							>
+								Apply
+							</button>
+						</div>
+					</div>
+				</div>
+			)}
 			<header className="flex justify-between items-center">
 				<div className="flex items-center gap-2">
 					<ModalConfig
@@ -232,12 +257,21 @@ function AccessScreen() {
 					>
 						Configure
 					</button>
+					<button
+						type="button"
+						className="px-4 py-1 rounded-lg bg-white hover:bg-gray-50 "
+						onClick={() => setShowAddressInput(!showAddressInput)}
+					>
+						Add Addresses
+					</button>
+					<span>{addressInput}</span>
 				</div>
 				<div className="flex gap-2">
 					<CacheTypeSelector mode={mode} onChange={handleChangeCacheType} />
 
 					<motion.button
 						onClick={() =>
+							// TODO : Change the actually write policy in cache config
 							setWritePolicy(
 								cacheConfig.writePolicy === "WRITE_BACK"
 									? "WRITE_THROUGH"
@@ -283,9 +317,9 @@ function AccessScreen() {
 							/>
 						</div>
 						<div className="flex flex-col lg:flex-row w-full gap-4">
-							<div className="flex flex-col w-full gap-4">
+							<div className="flex flex-col w-full max-w-6xl gap-4">
 								{/* Cache Blocks */}
-								<div className="flex flex-col gap-2 w-full">
+								<div className="flex flex-1 flex-col gap-2 w-full">
 									<button
 										type="button"
 										onClick={() => setIsCacheBlocksOpen(!isCacheBlocksOpen)}
@@ -417,19 +451,19 @@ function AccessScreen() {
 										<div className="flex gap-4 mb-6">
 											<div className="flex-1 rounded-lg p-3 bg-blue-50 border border-blue-100">
 												<div className="text-xl font-medium text-blue-600 mb-1">
-													{Number.parseInt(readStallCycle)}
+													{Number.parseInt(memoryWrites)}
 												</div>
 												<div className="text-xs text-blue-500">
-													Read Stall Cycles
+													Total Memory Writes
 												</div>
 											</div>
 
 											<div className="flex-1 rounded-lg p-3 bg-indigo-50 border border-indigo-100">
 												<div className="text-xl font-medium text-indigo-600 mb-1">
-													{Number.parseInt(writeStallCycle)}
+													{Number.parseInt(energyConsumption)}
 												</div>
 												<div className="text-xs text-indigo-500">
-													Write Stall Cycles
+													Energy Consumption
 												</div>
 											</div>
 										</div>

@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import React, { useState, useEffect } from "react";
+import Pagination from "./Pagination";
 
 function CustomTable({
 	caches,
@@ -155,10 +156,9 @@ function CustomTable({
 
 	// Calculate total pages
 	const totalPages = Math.ceil(processedCaches.length / itemsPerPage);
-	console.log(currentItems);
 
 	return (
-		<div className="overflow-x-auto min-w-md rounded-xl shadow bg-white">
+		<div className="overflow-x-auto h-full min-w-md rounded-xl shadow bg-white">
 			<table className="w-full">
 				<thead className="bg-gray-100 text-center">
 					<tr>
@@ -236,34 +236,12 @@ function CustomTable({
 				</tbody>
 			</table>
 			{totalPages > 1 && (
-				<div className="flex justify-center my-4 text-sm">
-					<button
-						type="button"
-						onClick={() => handlePageChange(currentPage - 1)}
-						disabled={currentPage === 1}
-						className="px-4 py-2 mx-1 bg-gray-200 rounded disabled:opacity-50"
-					>
-						Previous
-					</button>
-					{Array.from({ length: totalPages }, (_, i) => (
-						<button
-							type="button"
-							key={i + 1}
-							onClick={() => handlePageChange(i + 1)}
-							className={`px-4 py-2 mx-1 rounded ${currentPage === i + 1 ? "bg-black text-white" : "bg-gray-200"}`}
-						>
-							{i + 1}
-						</button>
-					))}
-					<button
-						type="button"
-						onClick={() => handlePageChange(currentPage + 1)}
-						disabled={currentPage === totalPages}
-						className="px-4 py-2 mx-1 bg-gray-200 rounded disabled:opacity-50"
-					>
-						Next
-					</button>
-				</div>
+				<Pagination
+					limit={5}
+					totalPages={totalPages}
+					setCurrentPage={setCurrentPage}
+					currentPage={currentPage}
+				/>
 			)}
 		</div>
 	);

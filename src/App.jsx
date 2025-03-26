@@ -10,16 +10,6 @@ function App() {
 					<div>
 						<h1 className="font-bold">COMCACHE</h1>
 					</div>
-					<div>
-						<ul className="flex gap-4 text-sm">
-							<li className="p-2 rounded-2xl">
-								<a href="/">Access</a>
-							</li>
-							<li className="p-2 rounded-2xl">
-								<a href="/performance">Performance</a>
-							</li>
-						</ul>
-					</div>
 				</nav>
 			</header>
 			{/* Main */}

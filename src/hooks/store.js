@@ -3,7 +3,6 @@ import { create } from "zustand";
 const useSimStore = create((set, get) => ({
 	/*** CONFIGURATIONS ***/
 	mode: "DIRECT_MAPPED", // "DIRECT_MAPPED", "SET_ASSOCIATIVE", "FULLY_ASSOCIATIVE"
-
 	cacheSizeOptions: [
 		8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768,
 	], // in bytes
@@ -76,6 +75,8 @@ const useSimStore = create((set, get) => ({
 		writeMissPenalty: 0,
 		writeBufferStall: 0,
 		cpuTime: 0,
+		memoryWrites: 0,
+		energyConsumption: 0,
 	},
 
 	/*** SIMULATION STATE ***/
@@ -215,6 +216,11 @@ const useSimStore = create((set, get) => ({
 			? get().getWriteMissPenaltyWithBuffer(writeBufferStall)
 			: get().getWriteMissPenalty();
 		const cpuTime = get().cpuConfig.cpi + readStallCycle + writeStallCycle;
+		const memoryWrites = get().performanceMetrics.memoryWrites;
+		// for seeing the key different
+		const energyPerWrite =
+			get().cacheConfig.writePolicy === "WRITE_THROUGH" ? 1 : 0.5;
+		const energyConsumption = memoryWrites * energyPerWrite;
 		set(() => ({
 			performanceMetrics: {
 				hitRate,
@@ -225,6 +231,8 @@ const useSimStore = create((set, get) => ({
 				writeMissPenalty,
 				writeBufferStall,
 				cpuTime,
+				memoryWrites,
+				energyConsumption,
 			},
 		}));
 		set((prev) => ({
@@ -336,6 +344,8 @@ const useSimStore = create((set, get) => ({
 				writeMissPenalty: 0,
 				writeBufferStall: 0,
 				cpuTime: 0,
+				memoryWrites: 0,
+				energyConsumption: 0,
 			},
 			performanceMetricsHistory: [],
 		}));
@@ -444,6 +454,10 @@ const useSimStore = create((set, get) => ({
 							miss: prev.countCacheResult.miss + 1,
 						},
 						totalWrites: prev.totalWrites + 1,
+						performanceMetrics: {
+							...prev.performanceMetrics,
+							memoryWrites: prev.performanceMetrics.memoryWrites + 1,
+						},
 					}));
 				} else {
 					// MISS
@@ -467,6 +481,13 @@ const useSimStore = create((set, get) => ({
 							miss: prev.countCacheResult.miss + 1,
 						},
 						totalReads: prev.totalReads + 1,
+						performanceMetrics: {
+							...prev.performanceMetrics,
+							memoryWrites:
+								prev.cacheConfig.writePolicy === "WRITE_BACK"
+									? prev.performanceMetrics.memoryWrites
+									: prev.performanceMetrics.memoryWrites + 1,
+						},
 					}));
 				}
 				return { ...state, caches: newCaches };
@@ -515,7 +536,7 @@ const useSimStore = create((set, get) => ({
 				"🏁 Finalizing simulation and compiling performance metrics.",
 			actionMessage: () =>
 				`🎉 Direct-Mapped Simulation Complete!
-Hit Rate: ${(get().performanceMetrics.hitRate * 100).toFixed(1)}% (Hits: ${get().countCacheResult.hit} / Total: ${get().countCacheResult.hit + get().countCacheResult.miss})`,
+				Hit Rate: ${(get().performanceMetrics.hitRate * 100).toFixed(1)}% (Hits: ${get().countCacheResult.hit} / Total: ${get().countCacheResult.hit + get().countCacheResult.miss})`,
 			action: (state) => {
 				get().updatePerformanceMetrics();
 				set(() => ({ cacheResult: null, action: null, actionToIndex: null }));
@@ -651,6 +672,10 @@ Hit Rate: ${(get().performanceMetrics.hitRate * 100).toFixed(1)}% (Hits: ${get()
 							miss: prev.countCacheResult.miss + 1,
 						},
 						totalWrites: prev.totalWrites + 1,
+						performanceMetrics: {
+							...prev.performanceMetrics,
+							memoryWrites: prev.performanceMetrics.memoryWrites + 1,
+						},
 					}));
 					return { ...state, caches: newCaches };
 				}
@@ -681,6 +706,13 @@ Hit Rate: ${(get().performanceMetrics.hitRate * 100).toFixed(1)}% (Hits: ${get()
 						miss: prev.countCacheResult.miss + 1,
 					},
 					totalReads: prev.totalReads + 1,
+					performanceMetrics: {
+						...prev.performanceMetrics,
+						memoryWrites:
+							prev.cacheConfig.writePolicy === "WRITE_BACK"
+								? prev.performanceMetrics.memoryWrites
+								: prev.performanceMetrics.memoryWrites + 1,
+					},
 				}));
 				return { ...state, caches: newCaches };
 			},
@@ -871,6 +903,10 @@ Hit Rate: ${(get().performanceMetrics.hitRate * 100).toFixed(1)}% (Hits: ${get()
 							miss: prev.countCacheResult.miss + 1,
 						},
 						totalWrites: prev.totalWrites + 1,
+						performanceMetrics: {
+							...prev.performanceMetrics,
+							memoryWrites: prev.performanceMetrics.memoryWrites + 1,
+						},
 					}));
 					return { ...state, caches: newCaches };
 				}
@@ -901,6 +937,13 @@ Hit Rate: ${(get().performanceMetrics.hitRate * 100).toFixed(1)}% (Hits: ${get()
 						miss: prev.countCacheResult.miss + 1,
 					},
 					totalReads: prev.totalReads + 1,
+					performanceMetrics: {
+						...prev.performanceMetrics,
+						memoryWrites:
+							prev.cacheConfig.writePolicy === "WRITE_BACK"
+								? prev.performanceMetrics.memoryWrites
+								: prev.performanceMetrics.memoryWrites + 1,
+					},
 				}));
 				return { ...state, caches: newCaches };
 			},
@@ -1102,6 +1145,8 @@ Hit Rate: ${(get().performanceMetrics.hitRate * 100).toFixed(1)}% (Hits: ${get()
 				writeMissPenalty: 0,
 				writeBufferStall: 0,
 				cpuTime: 0,
+				memoryWrites: 0,
+				energyConsumption: 0,
 			},
 		};
 		set({
