@@ -310,6 +310,7 @@ function AccessScreen() {
 								Cache Blocks
 							</h3>
 							<SimulationControls
+								disabled={addresses.length === 0}
 								onReset={handleReset}
 								onPrevious={handlePreviousStep}
 								onNext={handleNextStep}
@@ -447,7 +448,6 @@ function AccessScreen() {
 											</div>
 										</div>
 
-										{/* Stall Cycles */}
 										<div className="flex gap-4 mb-6">
 											<div className="flex-1 rounded-lg p-3 bg-blue-50 border border-blue-100">
 												<div className="text-xl font-medium text-blue-600 mb-1">
